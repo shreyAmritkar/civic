@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>CivicTrack</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <header>
+    <a class="brand" href="/">CivicTrack</a>
+    <span id="user"></span>
+    <button id="logout" hidden>Log out</button>
+  </header>
+  <main>
+    <section id="auth" class="grid">
+      <article>
+        <h1>Report. Track. Verify.</h1>
+        <p>Community issues stay visible until citizens confirm they are resolved.</p>
+      </article>
+      <form id="login">
+        <h2>Sign in</h2>
+        <input name="email" type="email" placeholder="Email" required>
+        <input name="password" type="password" placeholder="Password" required>
+        <button>Sign in</button>
+        <p id="auth-error"></p>
+      </form>
+      <form id="register">
+        <h2>Create citizen account</h2>
+        <input name="name" placeholder="Full name" required>
+        <input name="email" type="email" placeholder="Email" required>
+        <input name="password" type="password" placeholder="Password (6+ characters)" required>
+        <button>Create account</button>
+      </form>
+    </section>
+
+    <section id="app" hidden>
+      <div class="tabs">
+        <button data-view="citizen">My complaints</button>
+        <button data-view="official">Official desk</button>
+        <button data-view="admin">Admin desk</button>
+      </div>
+
+      <section id="citizen" class="view">
+        <div class="grid">
+          <form id="new-complaint">
+            <h2>Report an issue</h2>
+            <input name="title" placeholder="Short title" required>
+            <textarea name="description" placeholder="Describe the issue and what you observed" required></textarea>
+            <select name="category">
+              <option>ROADS</option>
+              <option>WASTE</option>
+              <option>WATER</option>
+              <option>STREETLIGHTS</option>
+              <option>DRAINAGE</option>
+              <option>OTHER</option>
+            </select>
+            <select name="priority">
+              <option>LOW</option>
+              <option selected>MEDIUM</option>
+              <option>HIGH</option>
+              <option>URGENT</option>
+            </select>
+            <input name="location" placeholder="Location" required>
+            <input name="ward" placeholder="Ward (optional)">
+            <label class="meta">Photos or videos (optional, up to 5 files)
+              <input name="evidence" type="file" multiple
+                accept="image/jpeg,image/png,image/webp,video/mp4,video/webm,video/quicktime">
+            </label>
+            <button>Submit complaint</button>
+            <p id="upload-status" class="meta"></p>
+          </form>
+          <article>
+            <h2>Notifications</h2>
+            <div id="notifications"></div>
+          </article>
+        </div>
+        <h2>My reports</h2>
+        <div id="my-list" class="cards"></div>
+      </section>
+
+      <section id="official" class="view" hidden>
+        <h2>Department complaints</h2>
+        <div id="official-list" class="cards"></div>
+      </section>
+
+      <section id="admin" class="view" hidden>
+        <div class="grid">
+          <form id="new-department">
+            <h2>Create department</h2>
+            <input name="name" placeholder="Name" required>
+            <input name="categories" placeholder="Categories, e.g. ROADS, DRAINAGE" required>
+            <button>Save department</button>
+          </form>
+          <article>
+            <h2>Review queue</h2>
+            <p>Assign complaints that could not be routed automatically.</p>
+          </article>
+        </div>
+        <div id="admin-list" class="cards"></div>
+      </section>
+
+      <dialog id="detail">
+        <button class="close">×</button>
+        <div id="detail-body"></div>
+      </dialog>
+    </section>
+  </main>
+  <script src="/app.js"></script>
+</body>
+</html>
