@@ -1,3 +1,4 @@
+
 services:
   postgres:
     image: postgres:16-alpine
@@ -15,6 +16,13 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+
+  mailpit:
+    image: axllent/mailpit
+    container_name: civictrack-mailpit
+    ports:
+      - "1025:1025"   # SMTP, the app sends here
+      - "8025:8025"   # Web inbox: http://localhost:8025
 
 volumes:
   civictrack-postgres-data:

@@ -1,61 +1,56 @@
 package com.civictrack.security;
 
+import io.github.bucket4j.Bandwidth;
+import io.github.bucket4j.Bucket;
+import io.github.bucket4j.ConsumptionProbe;
 import java.time.Duration;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
- * In-memory token bucket limiter. No Redis or extra library needed.
+ * Rate limiter backed by Bucket4j (token bucket). One bucket per key, e.g. "login|ip:1.2.3.4".
  * A bucket holds up to "limit" tokens and refills evenly over "window", so a client may burst
  * up to the limit and is then held to limit / window on average.
- * Note: the counters live in this JVM only. Run more than one app instance and each has its own.
+ * The buckets live in this JVM only. To share them between containers, switch to Bucket4j's Redis
+ * module (ProxyManager); the rest of the application does not need to change.
  */
 public class RateLimiter {
     public record Result(boolean allowed, long retryAfterSeconds) {
     }
 
-    private static class Bucket {
-        double tokens;
-        long lastRefill;
-        long idleAfter;
+    private static class Entry {
+        final Bucket bucket;
+        final long idleAfterNanos;
+        volatile long lastUsed;
 
-        Bucket(double tokens, long now) {
-            this.tokens = tokens;
-            this.lastRefill = now;
+        Entry(int limit, Duration window, long now) {
+            bucket = Bucket.builder()
+                    .addLimit(Bandwidth.builder().capacity(limit).refillGreedy(limit, window).build()).build();
+            idleAfterNanos = window.toNanos();
+            lastUsed = now;
         }
     }
 
-    private final ConcurrentHashMap<String, Bucket> buckets = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, Entry> buckets = new ConcurrentHashMap<>();
     private final AtomicLong lastCleanup = new AtomicLong(System.nanoTime());
 
     public Result tryAcquire(String key, int limit, Duration window) {
         long now = System.nanoTime();
         cleanup(now);
-        double ratePerNano = (double) limit / window.toNanos();
-        Bucket b = buckets.computeIfAbsent(key, k -> new Bucket(limit, now));
-        synchronized (b) {
-            b.tokens = Math.min(limit, b.tokens + (now - b.lastRefill) * ratePerNano);
-            b.lastRefill = now;
-            b.idleAfter = window.toNanos();
-            if (b.tokens >= 1) {
-                b.tokens -= 1;
-                return new Result(true, 0);
-            }
-            long waitNanos = (long) ((1 - b.tokens) / ratePerNano);
-            return new Result(false, Math.max(1, (waitNanos + 999_999_999L) / 1_000_000_000L));
-        }
+        Entry entry = buckets.computeIfAbsent(key, k -> new Entry(limit, window, now));
+        entry.lastUsed = now;
+        ConsumptionProbe probe = entry.bucket.tryConsumeAndReturnRemaining(1);
+        if (probe.isConsumed())
+            return new Result(true, 0);
+        long seconds = (probe.getNanosToWaitForRefill() + 999_999_999L) / 1_000_000_000L;
+        return new Result(false, Math.max(1, seconds));
     }
 
-    /** Once a minute, drop buckets that have been idle for a full window. They would be full again anyway. */
+    /** Bucket4j never forgets a bucket by itself. Once a minute, drop those idle for a full window (they are full again anyway). */
     private void cleanup(long now) {
         long last = lastCleanup.get();
         if (now - last < 60_000_000_000L || !lastCleanup.compareAndSet(last, now))
             return;
-        buckets.entrySet().removeIf(e -> {
-            Bucket b = e.getValue();
-            synchronized (b) {
-                return now - b.lastRefill > b.idleAfter;
-            }
-        });
+        buckets.values().removeIf(e -> now - e.lastUsed > e.idleAfterNanos);
     }
 }

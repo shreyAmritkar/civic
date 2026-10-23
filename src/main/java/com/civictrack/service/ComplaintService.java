@@ -19,9 +19,10 @@ public class ComplaintService {
     private final NotificationRepository notifications;
     private final JobScheduler scheduler;
     private final AiClassificationJob aiJob;
+    private final OutboxService outbox;
 
     public ComplaintService(ComplaintRepository c, DepartmentRepository d, AssignmentRepository a, HistoryRepository h,
-            NotificationRepository n, JobScheduler s, AiClassificationJob j) {
+            NotificationRepository n, JobScheduler s, AiClassificationJob j , OutboxService o) {
         complaints = c;
         departments = d;
         assignments = a;
@@ -29,6 +30,7 @@ public class ComplaintService {
         notifications = n;
         scheduler = s;
         aiJob = j;
+        outbox = o;
     }
 
     @Transactional
@@ -107,7 +109,7 @@ public class ComplaintService {
         transitionInternal(c, input.status(), input.note(), actor);
         return c;
     }
-
+    
     private void transitionInternal(Complaint c, ComplaintStatus next, String note, User actor) {
         if (!allowed(c.status, next))
             throw new IllegalArgumentException("Invalid transition from " + c.status + " to " + next);
@@ -121,6 +123,24 @@ public class ComplaintService {
         complaints.save(c);
         record(c, old, next, note, actor);
         notify(c.citizen, "Complaint '" + c.title + "' is now " + next);
+        if (!actor.id.equals(c.citizen.id)) // e-mail only when someone else (official/admin) acted
+            emailCitizen(c, next, note);
+    }
+
+    /** Queued in the outbox inside this transaction; the e-mail itself is sent later by a JobRunr worker. */
+    private void emailCitizen(Complaint c, ComplaintStatus next, String note) {
+        String what = switch (next) {
+            case SUBMITTED -> "was received";
+            case ASSIGNED -> "has been assigned to the responsible department";
+            case IN_PROGRESS -> "is now being worked on";
+            case RESOLVED -> "has been marked as resolved. Please open CivicTrack and confirm that the problem is really fixed";
+            case VERIFIED -> "has been verified and closed";
+            case REOPENED -> "has been reopened";
+        };
+        String body = "Hello " + c.citizen.name + ",\n\nYour complaint \"" + c.title + "\" " + what + ".\n"
+                + (note == null || note.isBlank() ? "" : "\nNote from the team: " + note + "\n")
+                + "\nOpen CivicTrack to see the full timeline.\n";
+        outbox.publish("COMPLAINT_STATUS", c.citizen, c, "CivicTrack: your complaint is now " + next, body);
     }
 
     private boolean allowed(ComplaintStatus a, ComplaintStatus b) {

@@ -5,6 +5,17 @@ spring:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/civictrack}
     username: ${DB_USERNAME:civictrack}
     password: ${DB_PASSWORD:civictrack}
+  mail:
+    host: ${MAIL_HOST:localhost}
+    port: ${MAIL_PORT:1025}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    properties:
+      mail.smtp.auth: ${MAIL_AUTH:false}
+      mail.smtp.starttls.enable: ${MAIL_STARTTLS:false}
+      mail.smtp.connectiontimeout: 5000
+      mail.smtp.timeout: 5000
+      mail.smtp.writetimeout: 5000
   jpa:
     hibernate.ddl-auto: validate
     open-in-view: false
@@ -22,6 +33,8 @@ app:
   jwt:
     secret: ${JWT_SECRET:change-me-to-a-long-random-secret-for-local-development}
     expiration-ms: ${JWT_EXPIRATION_MS:86400000}
+  mail:
+    from: ${MAIL_FROM:noreply@civictrack.local}
   llm:
     url: ${LLM_API_URL:http://localhost:11434/api/generate}
     model: ${LLM_MODEL:llama3.1:8b}
@@ -36,6 +49,6 @@ app:
     enabled: ${RATE_LIMIT_ENABLED:true}
 logging:
   level:
-    org.springframework.security: TRACE
+    org.springframework.security: INFO 
 
 
