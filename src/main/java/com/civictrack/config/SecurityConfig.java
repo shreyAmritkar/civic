@@ -1,6 +1,7 @@
 package com.civictrack.config;
-import jakarta.servlet.DispatcherType;
+
 import com.civictrack.security.*;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.*;
 import org.springframework.security.config.annotation.web.builders.*;
 import org.springframework.security.config.http.*;
@@ -17,13 +18,16 @@ public class SecurityConfig {
     }
 
     @Bean
-    SecurityFilterChain security(HttpSecurity h, JwtFilter f) throws Exception {
-        return h.csrf(c -> c.disable()).sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+    SecurityFilterChain security(HttpSecurity h, JwtFilter f,
+            @Value("${app.rate-limit.enabled:true}") boolean rateLimitEnabled) throws Exception {
+        h.csrf(c -> c.disable()).sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(
-                        a -> a.dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()
-                                .requestMatchers("/", "/index.html", "/app.js", "/styles.css","/dashboard", "/dashboard/**", "/api/auth/**").permitAll()
+                        a -> a.requestMatchers("/", "/index.html", "/app.js", "/styles.css", "/api/auth/**").permitAll()
                                 .requestMatchers("/api/admin/**").hasRole("ADMIN").requestMatchers("/api/official/**")
                                 .hasAnyRole("OFFICIAL", "ADMIN").anyRequest().authenticated())
-                .addFilterBefore(f, UsernamePasswordAuthenticationFilter.class).build();
+                .addFilterBefore(f, UsernamePasswordAuthenticationFilter.class);
+        if (rateLimitEnabled)
+            h.addFilterAfter(new RateLimitFilter(), JwtFilter.class);
+        return h.build();
     }
 }

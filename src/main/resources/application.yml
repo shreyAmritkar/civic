@@ -10,6 +10,7 @@ spring:
     open-in-view: false
   flyway:
     enabled: true
+    
 org:
   jobrunr:
     background-job-server:
@@ -31,6 +32,8 @@ app:
     access-key: ${AWS_ACCESS_KEY_ID:}
     secret-key: ${AWS_SECRET_ACCESS_KEY:}
     endpoint: ${S3_ENDPOINT:}
+  rate-limit:
+    enabled: ${RATE_LIMIT_ENABLED:true}
 logging:
   level:
     org.springframework.security: TRACE
